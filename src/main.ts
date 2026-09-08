@@ -8,3 +8,7 @@ if (!canvas) {
 
 const game = new SnakeGame(canvas);
 game.start();
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => game.dispose());
+}

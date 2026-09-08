@@ -99,6 +99,7 @@ export class SnakeGame {
     this.resetBoard();
     this.bindUi();
     this.resize();
+    requestAnimationFrame(() => this.resize());
     window.addEventListener("resize", () => this.resize());
     window.addEventListener("keydown", (e) => this.onKey(e));
     this.showOverlay("ready");
@@ -107,6 +108,11 @@ export class SnakeGame {
   start(): void {
     this.clock.start();
     this.renderer.setAnimationLoop(() => this.frame());
+  }
+
+  dispose(): void {
+    this.renderer.setAnimationLoop(null);
+    this.renderer.dispose();
   }
 
   private buildLights(): void {
@@ -185,14 +191,28 @@ export class SnakeGame {
     this.score = 0;
     this.tickAcc = 0;
     this.justGrew = false;
-    this.placeFood();
+    this.placeFood(true);
     this.syncHud();
     this.rebuildSnakeMeshes(1);
     this.updateFoodVisual();
   }
 
-  private placeFood(): void {
+  private placeFood(preferAhead = false): void {
     const occupied = new Set(this.snake.map(keyOf));
+    if (preferAhead) {
+      const head = this.snake[this.snake.length - 1];
+      const ahead = { x: head.x + this.dir.x * 4, z: head.z + this.dir.z * 4 };
+      if (
+        ahead.x >= 0 &&
+        ahead.z >= 0 &&
+        ahead.x < GRID_SIZE &&
+        ahead.z < GRID_SIZE &&
+        !occupied.has(keyOf(ahead))
+      ) {
+        this.food = ahead;
+        return;
+      }
+    }
     const empty: Vec2[] = [];
     for (let z = 0; z < GRID_SIZE; z += 1) {
       for (let x = 0; x < GRID_SIZE; x += 1) {
@@ -207,13 +227,19 @@ export class SnakeGame {
     this.overlayAction.addEventListener("click", () => this.onOverlayAction());
   }
 
+  private beginPlay(): void {
+    this.resetBoard();
+    this.phase = "playing";
+    this.clock.getDelta();
+    this.hideOverlay();
+  }
+
   private onOverlayAction(): void {
     if (this.phase === "ready" || this.phase === "over") {
-      this.resetBoard();
-      this.phase = "playing";
-      this.hideOverlay();
+      this.beginPlay();
     } else if (this.phase === "paused") {
       this.phase = "playing";
+      this.clock.getDelta();
       this.hideOverlay();
     }
   }
@@ -268,9 +294,7 @@ export class SnakeGame {
     }
 
     if (e.code === "KeyR") {
-      this.resetBoard();
-      this.phase = "playing";
-      this.hideOverlay();
+      this.beginPlay();
       return;
     }
 
@@ -278,9 +302,7 @@ export class SnakeGame {
     if (!next) return;
 
     if (this.phase === "ready" || this.phase === "over") {
-      this.resetBoard();
-      this.phase = "playing";
-      this.hideOverlay();
+      this.beginPlay();
     }
 
     if (!opposite(this.dir, next)) {
@@ -297,10 +319,11 @@ export class SnakeGame {
   }
 
   private frame(): void {
-    const dt = this.clock.getDelta();
+    const dt = Math.min(this.clock.getDelta(), 0.05);
     if (this.phase === "playing") {
       this.tickAcc += dt * 1000;
-      while (this.tickAcc >= TICK_MS) {
+      this.tickAcc = Math.min(this.tickAcc, TICK_MS * 2);
+      while (this.tickAcc >= TICK_MS && this.phase === "playing") {
         this.tickAcc -= TICK_MS;
         this.step();
       }
@@ -355,7 +378,7 @@ export class SnakeGame {
 
   private die(): void {
     this.phase = "over";
-    this.tickAcc = TICK_MS;
+    this.tickAcc = 0;
     this.syncHud();
     this.showOverlay("over");
   }
@@ -382,14 +405,15 @@ export class SnakeGame {
       this.snakeGroup.add(mesh);
     }
     while (this.snakeGroup.children.length > this.snake.length) {
-      const extra = this.snakeGroup.children.pop();
-      extra?.removeFromParent();
-      if (extra instanceof THREE.Mesh) {
-        extra.geometry.dispose();
-        const mat = extra.material;
+      const extra = this.snakeGroup.children[this.snakeGroup.children.length - 1];
+      this.snakeGroup.remove(extra);
+      extra.traverse((obj) => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        obj.geometry.dispose();
+        const mat = obj.material;
         if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
         else mat.dispose();
-      }
+      });
     }
 
     this.snake.forEach((cell, i) => {
