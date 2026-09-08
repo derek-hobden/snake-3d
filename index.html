@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Snake</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas"></canvas>
+      <div id="hud">
+        <div class="hud-row">
+          <span class="label">Score</span>
+          <span id="score">0</span>
+        </div>
+        <div class="hud-row">
+          <span class="label">Best</span>
+          <span id="best">0</span>
+        </div>
+      </div>
+      <p id="hint">Arrows / WASD to steer · Space pause · R restart</p>
+      <div id="overlay" class="hidden">
+        <div class="panel">
+          <h1 id="overlay-title">3D Snake</h1>
+          <p id="overlay-body">Eat the glowing orbs. Don't hit the walls or yourself.</p>
+          <p id="overlay-score" class="hidden"></p>
+          <button id="overlay-action" type="button">Play</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
